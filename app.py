@@ -186,7 +186,7 @@ if not df.empty:
                         """
                         
                         # 제미나이 모델 호출 (최신 flash 모델 권장)
-                        model = genai.GenerativeModel('gemini-1.5-pro')
+                        model = genai.GenerativeModel('gemini-pro')
                         response = model.generate_content(prompt)
                         
                         st.success("분석이 완료되었습니다!")
@@ -195,4 +195,5 @@ if not df.empty:
                         st.error(f"API 호출 중 문제가 발생했습니다: {e}")
             
         st.write("<br><br><br>", unsafe_allow_html=True)
+
 
