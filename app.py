@@ -1,7 +1,7 @@
 import streamlit as st
 import pandas as pd
 import plotly.express as px
-import google.generativeai as genai # 👈 제미나이 소환!
+import google.generativeai as genai
 
 # 1. 페이지 설정
 st.set_page_config(page_title="가족 자산 대시보드", layout="centered")
@@ -168,10 +168,7 @@ if not df.empty:
         else:
             if st.button("✨ 제미나이에게 현재 자산 분석 맡기기"):
                 with st.spinner("자산 포트폴리오를 꼼꼼히 분석하고 있습니다..."):
-if st.button("✨ 제미나이에게 현재 자산 분석 맡기기"):
-                with st.spinner("자산 포트폴리오를 꼼꼼히 분석하고 있습니다..."):
                     try:
-                        # 1. 프롬프트 작성 (기존과 동일)
                         asset_summary = df.groupby('대분류')['금액'].sum().to_dict()
                         prompt = f"""
                         당신은 우리 가족의 전속 프라이빗 뱅커(PB)입니다. 아래의 현재 자산 현황을 보고, 
@@ -187,14 +184,10 @@ if st.button("✨ 제미나이에게 현재 자산 분석 맡기기"):
                         *응답 시 마크다운(볼드체 등)과 이모지를 적절히 사용하여 모바일에서 읽기 좋게 작성해 주세요.*
                         """
                         
-                        # 💡 2. 절대 실패하지 않는 자동 모델 탐색 마법!
-                        # 내 API 키로 사용 가능한 모든 모델을 싹 뒤져서 가져옵니다.
+                        # 💡 무적의 자동 모델 탐색 로직 (들여쓰기 완벽 정렬됨)
                         valid_models = [m.name for m in genai.list_models() if 'generateContent' in m.supported_generation_methods]
-                        
-                        # 가장 빠르고 가성비 좋은 'flash' 모델을 찾고, 없으면 사용 가능한 첫 번째 모델을 알아서 고릅니다.
                         chosen_model = next((m for m in valid_models if 'flash' in m), valid_models[0])
                         
-                        # 3. 찾아낸 모델로 제미나이 소환!
                         model = genai.GenerativeModel(chosen_model)
                         response = model.generate_content(prompt)
                         
@@ -204,6 +197,3 @@ if st.button("✨ 제미나이에게 현재 자산 분석 맡기기"):
                         st.error(f"API 호출 중 문제가 발생했습니다: {e}")
             
         st.write("<br><br><br>", unsafe_allow_html=True)
-
-
-
