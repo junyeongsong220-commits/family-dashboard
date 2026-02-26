@@ -2,11 +2,18 @@ import streamlit as st
 import pandas as pd
 import plotly.express as px
 
-st.set_page_config(page_title="꼬뇽부부 자산 현황", layout="centered")
+st.set_page_config(page_title="가족 자산 대시보드", layout="centered")
 
-# --- CSS (디자인) ---
+# --- 🎨 1. CSS (디자인 설정: 여기에 사진 모서리 곡선 추가) ---
 st.markdown("""
 <style>
+    /* 📸 사진 모서리 둥글게 디자인 추가 */
+    img {
+        border-radius: 20px;
+        margin-bottom: 10px;
+        box-shadow: 0 4px 10px rgba(0,0,0,0.1);
+    }
+    
     div[data-testid="metric-container"] { background-color: #f8f9fa; border: 1px solid #e9ecef; padding: 8px 4px !important; border-radius: 12px; box-shadow: 2px 2px 8px rgba(0,0,0,0.05); }
     @media (prefers-color-scheme: dark) {
         div[data-testid="metric-container"] { background-color: #262730 !important; border: 1px solid #414141 !important; }
@@ -30,7 +37,7 @@ st.markdown("""
 </div>
 """, unsafe_allow_html=True)
 
-# --- 🔑 Secrets 로드 ---
+# --- 🔑 2. Secrets 및 도구 (기존과 동일) ---
 try:
     SHEET_ID = st.secrets["SHEET_ID"].strip()
     SHEET_GID = st.secrets["SHEET_GID"].strip()
@@ -48,16 +55,11 @@ def format_krw(amount):
     res += f"{man:,}만" if man > 0 else ""
     return f"{'-' if is_negative else ''}{res.strip()} 원"
 
-# --- 데이터 로드 ---
 @st.cache_data(ttl=60)
 def load_data():
     url = f"https://docs.google.com/spreadsheets/d/{SHEET_ID}/export?format=csv&gid={SHEET_GID}"
     try:
         df = pd.read_csv(url)
-        if '금액' not in df.columns or '대분류' not in df.columns:
-            st.error("❌ 가져온 시트에 [금액]이나 [대분류] 컬럼이 없습니다.")
-            return pd.DataFrame()
-
         df['금액'] = pd.to_numeric(df['금액'].astype(str).str.replace(',', '').str.replace('₩', ''), errors='coerce').fillna(0)
         df.loc[df['대분류'] == '부채', '금액'] = df.loc[df['대분류'] == '부채', '금액'].abs() * -1
         return df
@@ -67,31 +69,29 @@ def load_data():
 
 df = load_data()
 
-# --- 화면 렌더링 ---
+# --- 🚀 3. 화면 렌더링 (여기에 사진 위치!) ---
 if not df.empty:
     st.markdown("<div id='summary'></div>", unsafe_allow_html=True)
     
-    # 📸 최상단 헤더 이미지 추가
-    # 파일명은 깃허브에 올린 이름과 정확히 일치해야 합니다.
+    # ⭐ [family_photo.jpg]
+    # 깃허브에 올린 파일명과 똑같이 써주세요. 
+    # 가로로 긴(21:9) 사진을 올리시면 아주 예쁘게 나옵니다.
     try:
         st.image("family_photo.jpg", use_container_width=True)
     except:
-        # 사진이 없을 경우를 대비한 안전장치
-        pass
+        pass # 사진이 아직 업로드 전이면 그냥 넘어갑니다.
+
+    st.title("👨‍👩‍👧 꼬뇽부부 2026")
+    st.caption("화이팅! 잘하고 있다!")
     
-    st.title("👨‍👩‍👧 꼬뇽부부 자산 현황")
-    st.caption("꼬뇽부부 화이팅!!")
-    
+    # (이하 요약/차트/상세표 코드는 동일합니다...)
     net_worth = df['금액'].sum()
     total_assets = df[df['금액'] > 0]['금액'].sum()
     total_debts = df[df['금액'] < 0]['금액'].sum()
 
-    # 💡 프라이버시 토글 (스위치) 기능 추가
-    show_assets = st.toggle("👀 내 자산 금액 보기", value=False)
-
+    show_assets = st.toggle("👀 숨겨진 금액 확인하기", value=False)
     col1, col2, col3 = st.columns(3)
     
-    # 토글 상태에 따라 금액을 보여줄지 숨길지 결정
     if show_assets:
         col1.metric("💎 순자산", format_krw(net_worth))
         col2.metric("💰 총 자산", format_krw(total_assets))
@@ -145,4 +145,3 @@ if not df.empty:
             st.dataframe(res_df.style.apply(style_total, axis=1).format({"금액": "{:,.0f}"}), use_container_width=True, hide_index=True)
 
     st.write("<br><br><br>", unsafe_allow_html=True)
-
