@@ -2,42 +2,25 @@ import streamlit as st
 import pandas as pd
 import plotly.express as px
 
-# 1. 화면 설정
-st.set_page_config(page_title="꼬뇽부부 자산 현황", layout="centered")
-
-# (중략: 기존 CSS는 동일)
+st.set_page_config(page_title="가족 자산 대시보드", layout="centered")
 
 # --- 🔑 Secrets 로드 ---
-try:
-    SHEET_ID = st.secrets["SHEET_ID"]
-    SHEET_GID = st.secrets["SHEET_GID"]
-except:
-    st.error("❌ Streamlit Secrets 설정에서 SHEET_ID와 SHEET_GID를 확인해주세요!")
-    st.stop()
+SHEET_ID = st.secrets["SHEET_ID"]
+SHEET_GID = st.secrets["SHEET_GID"]
 
-def format_krw(amount):
-    is_negative = amount < 0
-    amount = abs(amount)
-    if amount == 0: return "0 원"
-    eok = int(amount // 100000000) 
-    man = int((amount % 100000000) // 10000) 
-    res = f"{eok}억 " if eok > 0 else ""
-    res += f"{man:,}만" if man > 0 else ""
-    return f"{'-' if is_negative else ''}{res.strip()} 원"
-
-# --- 2. 데이터 로드 (오직 구글 시트에서만!) ---
+# --- 데이터 로드 (오직 구글 시트만!) ---
 @st.cache_data(ttl=60)
 def load_data():
     url = f"https://docs.google.com/spreadsheets/d/{SHEET_ID}/export?format=csv&gid={SHEET_GID}"
     try:
         df = pd.read_csv(url)
-        # 금액 숫자로 변환
-        df['금액'] = pd.to_numeric(df['금액'].astype(str).str.replace(',', ''), errors='coerce').fillna(0)
-        # 부채 처리
+        # 금액 숫자로 변환 (콤마, 원 기호 제거)
+        df['금액'] = pd.to_numeric(df['금액'].astype(str).str.replace(',', '').str.replace('₩', ''), errors='coerce').fillna(0)
+        # 부채는 마이너스로 처리
         df.loc[df['대분류'] == '부채', '금액'] = df.loc[df['대분류'] == '부채', '금액'].abs() * -1
         return df
     except Exception as e:
-        st.error(f"⚠️ 구글 시트 로드 실패: {e}")
+        st.error(f"❌ 구글 시트를 불러올 수 없습니다: {e}")
         return pd.DataFrame()
 
 df = load_data()
@@ -81,3 +64,4 @@ def draw_section(data, col):
     st.plotly_chart(fig2, use_container_width=True)
 
 # (이후 탭 및 상세표 코드는 기존과 동일)
+
