@@ -71,15 +71,27 @@ df = load_data()
 if not df.empty:
     st.markdown("<div id='summary'></div>", unsafe_allow_html=True)
     st.title("👨‍👩‍👧 꼬뇽부부 자산 현황")
+    st.caption("새로고침 시 실시간 시세가 반영됩니다.")
     
     net_worth = df['금액'].sum()
     total_assets = df[df['금액'] > 0]['금액'].sum()
     total_debts = df[df['금액'] < 0]['금액'].sum()
 
+    # 💡 프라이버시 토글 (스위치) 기능 추가
+    show_assets = st.toggle("👀 내 자산 금액 보기", value=False)
+
     col1, col2, col3 = st.columns(3)
-    col1.metric("💎 순자산", format_krw(net_worth))
-    col2.metric("💰 총 자산", format_krw(total_assets))
-    col3.metric("💸 총 부채", format_krw(total_debts))
+    
+    # 토글 상태에 따라 금액을 보여줄지 숨길지 결정
+    if show_assets:
+        col1.metric("💎 순자산", format_krw(net_worth))
+        col2.metric("💰 총 자산", format_krw(total_assets))
+        col3.metric("💸 총 부채", format_krw(total_debts))
+    else:
+        col1.metric("💎 순자산", "👆 클릭해서 확인!")
+        col2.metric("💰 총 자산", "👆 클릭해서 확인!")
+        col3.metric("💸 총 부채", "👆 클릭해서 확인!")
+        
     st.divider()
 
     st.markdown("<div id='charts'></div>", unsafe_allow_html=True)
@@ -95,7 +107,6 @@ if not df.empty:
         fig1.update_layout(margin=dict(t=5, b=5, l=5, r=5), showlegend=False, paper_bgcolor='rgba(0,0,0,0)')
         st.plotly_chart(fig1, use_container_width=True)
         
-        # 💡 에러 발생했던 반올림 로직 완벽 수정! (round 함수 위치 변경)
         grouped['멤버총합'] = grouped.groupby('구성원')['금액'].transform('sum')
         grouped['비중'] = grouped.apply(lambda x: round((x['금액']/x['멤버총합']*100), 1) if x['멤버총합'] > 0 else 0, axis=1)
         grouped['라벨'] = grouped[col] + " " + grouped['비중'].astype(str) + "%"
