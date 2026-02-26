@@ -54,9 +54,8 @@ def load_data():
     url = f"https://docs.google.com/spreadsheets/d/{SHEET_ID}/export?format=csv&gid={SHEET_GID}"
     try:
         df = pd.read_csv(url)
-        # 💡 안전장치: 올바른 탭이 맞는지 검사
         if '금액' not in df.columns or '대분류' not in df.columns:
-            st.error("❌ 가져온 시트에 [금액]이나 [대분류] 컬럼이 없습니다. GID가 올바른 탭을 가리키는지 확인하세요!")
+            st.error("❌ 가져온 시트에 [금액]이나 [대분류] 컬럼이 없습니다.")
             return pd.DataFrame()
 
         df['금액'] = pd.to_numeric(df['금액'].astype(str).str.replace(',', '').str.replace('₩', ''), errors='coerce').fillna(0)
@@ -96,8 +95,9 @@ if not df.empty:
         fig1.update_layout(margin=dict(t=5, b=5, l=5, r=5), showlegend=False, paper_bgcolor='rgba(0,0,0,0)')
         st.plotly_chart(fig1, use_container_width=True)
         
+        # 💡 에러 발생했던 반올림 로직 완벽 수정! (round 함수 위치 변경)
         grouped['멤버총합'] = grouped.groupby('구성원')['금액'].transform('sum')
-        grouped['비중'] = grouped.apply(lambda x: (x['금액']/x['멤버총합']*100).round(1) if x['멤버총합'] > 0 else 0, axis=1)
+        grouped['비중'] = grouped.apply(lambda x: round((x['금액']/x['멤버총합']*100), 1) if x['멤버총합'] > 0 else 0, axis=1)
         grouped['라벨'] = grouped[col] + " " + grouped['비중'].astype(str) + "%"
         
         fig2 = px.bar(grouped, y='구성원', x='금액', color=col, orientation='h', text='라벨', color_discrete_sequence=px.colors.qualitative.Pastel)
