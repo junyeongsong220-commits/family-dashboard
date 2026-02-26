@@ -168,8 +168,10 @@ if not df.empty:
         else:
             if st.button("✨ 제미나이에게 현재 자산 분석 맡기기"):
                 with st.spinner("자산 포트폴리오를 꼼꼼히 분석하고 있습니다..."):
+if st.button("✨ 제미나이에게 현재 자산 분석 맡기기"):
+                with st.spinner("자산 포트폴리오를 꼼꼼히 분석하고 있습니다..."):
                     try:
-                        # 자산 데이터를 요약하여 제미나이에게 보낼 프롬프트 작성
+                        # 1. 프롬프트 작성 (기존과 동일)
                         asset_summary = df.groupby('대분류')['금액'].sum().to_dict()
                         prompt = f"""
                         당신은 우리 가족의 전속 프라이빗 뱅커(PB)입니다. 아래의 현재 자산 현황을 보고, 
@@ -185,8 +187,15 @@ if not df.empty:
                         *응답 시 마크다운(볼드체 등)과 이모지를 적절히 사용하여 모바일에서 읽기 좋게 작성해 주세요.*
                         """
                         
-                        # 제미나이 모델 호출 (최신 flash 모델 권장)
-                        model = genai.GenerativeModel('gemini-pro')
+                        # 💡 2. 절대 실패하지 않는 자동 모델 탐색 마법!
+                        # 내 API 키로 사용 가능한 모든 모델을 싹 뒤져서 가져옵니다.
+                        valid_models = [m.name for m in genai.list_models() if 'generateContent' in m.supported_generation_methods]
+                        
+                        # 가장 빠르고 가성비 좋은 'flash' 모델을 찾고, 없으면 사용 가능한 첫 번째 모델을 알아서 고릅니다.
+                        chosen_model = next((m for m in valid_models if 'flash' in m), valid_models[0])
+                        
+                        # 3. 찾아낸 모델로 제미나이 소환!
+                        model = genai.GenerativeModel(chosen_model)
                         response = model.generate_content(prompt)
                         
                         st.success("분석이 완료되었습니다!")
@@ -195,5 +204,6 @@ if not df.empty:
                         st.error(f"API 호출 중 문제가 발생했습니다: {e}")
             
         st.write("<br><br><br>", unsafe_allow_html=True)
+
 
 
