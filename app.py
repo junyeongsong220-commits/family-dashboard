@@ -112,19 +112,30 @@ st.markdown("<div id='charts'></div>", unsafe_allow_html=True)
 st.subheader("📊 포트폴리오 구성")
 
 def draw_section(data, col):
-    if data.empty: return st.info("데이터가 없습니다.")
+    if data.empty or data['금액'].abs().sum() == 0: # 💡 합계가 0인 경우 처리 추가
+        return st.info("표시할 데이터가 없습니다 (금액이 0원입니다).")
+    
     plot_df = data.copy()
     plot_df['금액'] = plot_df['금액'].abs()
     grouped = plot_df.groupby(['구성원', col], as_index=False)['금액'].sum()
     
+    # 도넛 차트
     fig1 = px.pie(grouped, values='금액', names=col, hole=0.4, color_discrete_sequence=px.colors.qualitative.Pastel)
     fig1.update_layout(margin=dict(t=5, b=5, l=5, r=5), showlegend=False, paper_bgcolor='rgba(0,0,0,0)')
     st.plotly_chart(fig1, use_container_width=True)
     
-    grouped['비중'] = (grouped['금액'] / grouped.groupby('구성원')['금액'].transform('sum') * 100).round(1)
+    # 100% 바 차트 (💡 0으로 나누기 방지 로직 적용)
+    total_sum_per_member = grouped.groupby('구성원')['금액'].transform('sum')
+    grouped['비중'] = grouped.apply(
+        lambda x: (x['금액'] / total_sum_per_member[grouped.index == x.name].values[0] * 100).round(1) 
+        if total_sum_per_member[grouped.index == x.name].values[0] > 0 else 0, 
+        axis=1
+    )
+    
     grouped['라벨'] = grouped[col] + " " + grouped['비중'].astype(str) + "%"
     fig2 = px.bar(grouped, y='구성원', x='금액', color=col, orientation='h', text='라벨', color_discrete_sequence=px.colors.qualitative.Pastel)
     fig2.update_layout(barmode='stack', barnorm='percent', margin=dict(t=5, b=5, l=5, r=5), showlegend=False, xaxis=dict(showticklabels=False), yaxis_title=None, paper_bgcolor='rgba(0,0,0,0)')
+    fig2.update_traces(textposition='inside')
     st.plotly_chart(fig2, use_container_width=True)
 
 tab1, tab2, tab3 = st.tabs(["💸 금융", "🏠 부동산/부채", "📦 기타"])
@@ -145,5 +156,6 @@ for i, tab in enumerate(tabs):
         target = df.copy() if m_list[i] == '전체' else df[df['구성원'] == m_list[i]].copy()
         res_df = pd.concat([pd.DataFrame([{'구성원': '💡 합계', '대분류': '-', '소분류': '총 순자산', '금액': target['금액'].sum()}]), target], ignore_index=True)
         st.dataframe(res_df.style.apply(style_total, axis=1).format({"금액": "{:,.0f}"}), use_container_width=True, hide_index=True)
+
 
 st.write("<br><br><br>", unsafe_allow_html=True)
