@@ -2,28 +2,61 @@ import streamlit as st
 import pandas as pd
 import plotly.express as px
 
+# 1. 페이지 설정
 st.set_page_config(page_title="가족 자산 대시보드", layout="centered")
 
-# --- 🎨 1. CSS (디자인 설정: 여기에 사진 모서리 곡선 추가) ---
+# --- 🎨 2. CSS (여백 제거, 폰트 조절 포함) ---
 st.markdown("""
 <style>
-    /* 📸 사진 모서리 둥글게 디자인 추가 */
+    /* 상단 여백 및 헤더 제거 */
+    .block-container {
+        padding-top: 1.5rem !important;
+        padding-bottom: 0rem !important;
+        padding-left: 1rem !important;
+        padding-right: 1rem !important;
+    }
+    header {
+        visibility: hidden;
+        height: 0px;
+    }
+    
+    /* 가족 사진 디자인 */
     img {
         border-radius: 20px;
         margin-bottom: 10px;
         box-shadow: 0 4px 10px rgba(0,0,0,0.1);
     }
+
+    /* 💡 타이틀(h3) 디자인 커스텀 */
+    .main-title {
+        font-size: 1.4rem !important; /* 기존보다 훨씬 컴팩트해진 크기 */
+        font-weight: 800;
+        margin-bottom: 2px;
+        color: #31333F;
+    }
+    @media (prefers-color-scheme: dark) {
+        .main-title { color: #ffffff; }
+    }
+
+    /* 요약 지표 카드 */
+    div[data-testid="metric-container"] { 
+        background-color: #f8f9fa; 
+        border: 1px solid #e9ecef; 
+        padding: 8px 4px !important; 
+        border-radius: 12px; 
+        box-shadow: 2px 2px 8px rgba(0,0,0,0.05); 
+    }
     
-    div[data-testid="metric-container"] { background-color: #f8f9fa; border: 1px solid #e9ecef; padding: 8px 4px !important; border-radius: 12px; box-shadow: 2px 2px 8px rgba(0,0,0,0.05); }
     @media (prefers-color-scheme: dark) {
         div[data-testid="metric-container"] { background-color: #262730 !important; border: 1px solid #414141 !important; }
         [data-testid="stMetricValue"] { color: #ffffff !important; }
         [data-testid="stMetricLabel"] { color: #aaaaaa !important; }
-        .floating-nav { background-color: rgba(38, 39, 48, 0.95) !important; border: 1px solid #444 !important; }
-        .floating-nav a { color: #ffffff !important; }
     }
+
     [data-testid="stMetricValue"] { font-size: 0.95rem !important; font-weight: 700 !important; }
     [data-testid="stMetricLabel"] { font-size: 0.7rem !important; }
+
+    /* 하단 플로팅 바 */
     .floating-nav {
         position: fixed; bottom: 15px; left: 50%; transform: translateX(-50%);
         background-color: rgba(255, 255, 255, 0.95); backdrop-filter: blur(8px); padding: 8px 18px; border-radius: 25px;
@@ -32,17 +65,18 @@ st.markdown("""
     .floating-nav a { text-decoration: none; color: #555; font-size: 0.8rem; font-weight: 600; }
     html { scroll-behavior: smooth; }
 </style>
+
 <div class="floating-nav">
     <a href="#summary">💰 요약</a> <a href="#charts">📊 구성</a> <a href="#table">📋 상세</a>
 </div>
 """, unsafe_allow_html=True)
 
-# --- 🔑 2. Secrets 및 도구 (기존과 동일) ---
+# --- 🔑 3. 데이터 로직 (생략 없음) ---
 try:
     SHEET_ID = st.secrets["SHEET_ID"].strip()
     SHEET_GID = st.secrets["SHEET_GID"].strip()
 except:
-    st.error("❌ Secrets 설정 확인 필요")
+    st.error("Secrets 설정을 확인해주세요!")
     st.stop()
 
 def format_krw(amount):
@@ -64,50 +98,51 @@ def load_data():
         df.loc[df['대분류'] == '부채', '금액'] = df.loc[df['대분류'] == '부채', '금액'].abs() * -1
         return df
     except Exception as e:
-        st.error(f"❌ 데이터 로드 실패: {e}")
+        st.error(f"데이터 로드 실패: {e}")
         return pd.DataFrame()
 
 df = load_data()
 
-# --- 🚀 3. 화면 렌더링 (여기에 사진 위치!) ---
+# --- 🚀 4. 메인 화면 구성 ---
 if not df.empty:
     st.markdown("<div id='summary'></div>", unsafe_allow_html=True)
     
-    # ⭐ [family_photo.jpg]
-    # 깃허브에 올린 파일명과 똑같이 써주세요. 
-    # 가로로 긴(21:9) 사진을 올리시면 아주 예쁘게 나옵니다.
+    # 가족 사진
     try:
         st.image("family_photo.jpg", use_container_width=True)
     except:
-        pass # 사진이 아직 업로드 전이면 그냥 넘어갑니다.
+        pass
 
-    st.title("👨‍👩‍👧 꼬뇽부부 2026")
-    st.caption("화이팅! 잘하고 있다!")
+    # 💡 타이틀명 변경 및 폰트 크기 조절 적용
+    st.markdown('<p class="main-title">🏠 Family Asset Monitor</p>', unsafe_allow_html=True)
+    st.caption("할 수 있다!!")
     
-    # (이하 요약/차트/상세표 코드는 동일합니다...)
     net_worth = df['금액'].sum()
     total_assets = df[df['금액'] > 0]['금액'].sum()
     total_debts = df[df['금액'] < 0]['금액'].sum()
 
-    show_assets = st.toggle("👀 숨겨진 금액 확인하기", value=False)
+    show_assets = st.toggle("👀 금액 보기", value=False)
+
     col1, col2, col3 = st.columns(3)
-    
     if show_assets:
         col1.metric("💎 순자산", format_krw(net_worth))
         col2.metric("💰 총 자산", format_krw(total_assets))
         col3.metric("💸 총 부채", format_krw(total_debts))
     else:
-        col1.metric("💎 순자산", "👆 클릭해서 확인!")
-        col2.metric("💰 총 자산", "👆 클릭해서 확인!")
-        col3.metric("💸 총 부채", "👆 클릭해서 확인!")
+        col1.metric("💎 순자산", "👆 클릭하여 확인하기")
+        col2.metric("💰 총 자산", "👆 클릭하여 확인하기")
+        col3.metric("💸 총 부채", "👆 클릭하여 확인하기")
         
     st.divider()
 
+    # --- 📊 5. 차트 섹션 ---
     st.markdown("<div id='charts'></div>", unsafe_allow_html=True)
     st.subheader("📊 포트폴리오 구성")
 
     def draw_section(data, col):
-        if data.empty or data['금액'].abs().sum() == 0: return st.info("데이터가 없습니다.")
+        if data.empty or data['금액'].abs().sum() == 0:
+            return st.info("데이터가 없습니다.")
+        
         plot_df = data.copy()
         plot_df['금액'] = plot_df['금액'].abs()
         grouped = plot_df.groupby(['구성원', col], as_index=False)['금액'].sum()
@@ -126,12 +161,16 @@ if not df.empty:
         st.plotly_chart(fig2, use_container_width=True)
 
     tab1, tab2, tab3 = st.tabs(["💸 금융", "🏠 부동산/부채", "📦 기타"])
-    with tab1: draw_section(df[~df['대분류'].isin(['부동산', '기타', '부채'])], '대분류')
-    with tab2: draw_section(df[df['대분류'].isin(['부동산', '부채'])], '소분류')
-    with tab3: draw_section(df[df['대분류'] == '기타'], '소분류')
+    with tab1:
+        draw_section(df[~df['대분류'].isin(['부동산', '기타', '부채'])], '대분류')
+    with tab2:
+        draw_section(df[df['대분류'].isin(['부동산', '부채'])], '소분류')
+    with tab3:
+        draw_section(df[df['대분류'] == '기타'], '소분류')
 
+    # --- 📋 6. 상세 내역 섹션 ---
     st.markdown("<div id='table'></div>", unsafe_allow_html=True)
-    st.subheader("📋 구성원별 자산 상세")
+    st.subheader("📋 구성원별 상세")
 
     def style_total(row):
         return ['background-color: #1d4ed8; color: #ffffff; font-weight: bold'] * len(row) if row['구성원'] == '💡 합계' else [''] * len(row)
