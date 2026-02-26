@@ -1,33 +1,127 @@
 import streamlit as st
 import pandas as pd
+import plotly.express as px
 
-st.set_page_config(page_title="구글 시트 연결 테스트", layout="centered")
+st.set_page_config(page_title="꼬뇽부부 자산 현황", layout="centered")
 
-st.title("🔍 구글 시트 연결 X-레이 테스트")
+# --- CSS (디자인) ---
+st.markdown("""
+<style>
+    div[data-testid="metric-container"] { background-color: #f8f9fa; border: 1px solid #e9ecef; padding: 8px 4px !important; border-radius: 12px; box-shadow: 2px 2px 8px rgba(0,0,0,0.05); }
+    @media (prefers-color-scheme: dark) {
+        div[data-testid="metric-container"] { background-color: #262730 !important; border: 1px solid #414141 !important; }
+        [data-testid="stMetricValue"] { color: #ffffff !important; }
+        [data-testid="stMetricLabel"] { color: #aaaaaa !important; }
+        .floating-nav { background-color: rgba(38, 39, 48, 0.95) !important; border: 1px solid #444 !important; }
+        .floating-nav a { color: #ffffff !important; }
+    }
+    [data-testid="stMetricValue"] { font-size: 0.95rem !important; font-weight: 700 !important; }
+    [data-testid="stMetricLabel"] { font-size: 0.7rem !important; }
+    .floating-nav {
+        position: fixed; bottom: 15px; left: 50%; transform: translateX(-50%);
+        background-color: rgba(255, 255, 255, 0.95); backdrop-filter: blur(8px); padding: 8px 18px; border-radius: 25px;
+        box-shadow: 0 4px 12px rgba(0,0,0,0.15); display: flex; gap: 15px; z-index: 1000; border: 1px solid #eee;
+    }
+    .floating-nav a { text-decoration: none; color: #555; font-size: 0.8rem; font-weight: 600; }
+    html { scroll-behavior: smooth; }
+</style>
+<div class="floating-nav">
+    <a href="#summary">💰 요약</a> <a href="#charts">📊 구성</a> <a href="#table">📋 상세</a>
+</div>
+""", unsafe_allow_html=True)
 
+# --- 🔑 Secrets 로드 ---
 try:
-    SHEET_ID = st.secrets["SHEET_ID"].strip() # 혹시 모를 공백 제거
+    SHEET_ID = st.secrets["SHEET_ID"].strip()
     SHEET_GID = st.secrets["SHEET_GID"].strip()
-except Exception as e:
-    st.error(f"Secrets 파일에 문제가 있습니다: {e}")
+except:
+    st.error("❌ Secrets 설정 확인 필요")
     st.stop()
 
-# 1. 값이 제대로 들어왔는지 확인
-st.write("### 1️⃣ Secrets 값 확인")
-st.write(f"- **ID**: `{SHEET_ID}` (길이: {len(SHEET_ID)})")
-st.write(f"- **GID**: `{SHEET_GID}` (길이: {len(SHEET_GID)})")
+def format_krw(amount):
+    is_negative = amount < 0
+    amount = abs(amount)
+    if amount == 0: return "0 원"
+    eok = int(amount // 100000000)
+    man = int((amount % 100000000) // 10000)
+    res = f"{eok}억 " if eok > 0 else ""
+    res += f"{man:,}만" if man > 0 else ""
+    return f"{'-' if is_negative else ''}{res.strip()} 원"
 
-# 2. 완성된 주소 확인
-url = f"https://docs.google.com/spreadsheets/d/{SHEET_ID}/export?format=csv&gid={SHEET_GID}"
-st.write("### 2️⃣ 데이터 요청 주소")
-st.code(url)
+# --- 데이터 로드 ---
+@st.cache_data(ttl=60)
+def load_data():
+    url = f"https://docs.google.com/spreadsheets/d/{SHEET_ID}/export?format=csv&gid={SHEET_GID}"
+    try:
+        df = pd.read_csv(url)
+        # 💡 안전장치: 올바른 탭이 맞는지 검사
+        if '금액' not in df.columns or '대분류' not in df.columns:
+            st.error("❌ 가져온 시트에 [금액]이나 [대분류] 컬럼이 없습니다. GID가 올바른 탭을 가리키는지 확인하세요!")
+            return pd.DataFrame()
 
-# 3. 데이터 로드 시도 및 실제 에러 메시지 출력
-st.write("### 3️⃣ 결과")
-try:
-    df = pd.read_csv(url)
-    st.success("✅ 구글 시트 데이터 로드 성공!")
-    st.dataframe(df)
-except Exception as e:
-    st.error("❌ 연결 실패! 아래의 에러 메시지를 확인하세요.")
-    st.code(str(e)) # 진짜 에러 원인을 보여줍니다.
+        df['금액'] = pd.to_numeric(df['금액'].astype(str).str.replace(',', '').str.replace('₩', ''), errors='coerce').fillna(0)
+        df.loc[df['대분류'] == '부채', '금액'] = df.loc[df['대분류'] == '부채', '금액'].abs() * -1
+        return df
+    except Exception as e:
+        st.error(f"❌ 데이터 로드 실패: {e}")
+        return pd.DataFrame()
+
+df = load_data()
+
+# --- 화면 렌더링 ---
+if not df.empty:
+    st.markdown("<div id='summary'></div>", unsafe_allow_html=True)
+    st.title("👨‍👩‍👧 꼬뇽부부 자산 현황")
+    
+    net_worth = df['금액'].sum()
+    total_assets = df[df['금액'] > 0]['금액'].sum()
+    total_debts = df[df['금액'] < 0]['금액'].sum()
+
+    col1, col2, col3 = st.columns(3)
+    col1.metric("💎 순자산", format_krw(net_worth))
+    col2.metric("💰 총 자산", format_krw(total_assets))
+    col3.metric("💸 총 부채", format_krw(total_debts))
+    st.divider()
+
+    st.markdown("<div id='charts'></div>", unsafe_allow_html=True)
+    st.subheader("📊 포트폴리오 구성")
+
+    def draw_section(data, col):
+        if data.empty or data['금액'].abs().sum() == 0: return st.info("데이터가 없습니다.")
+        plot_df = data.copy()
+        plot_df['금액'] = plot_df['금액'].abs()
+        grouped = plot_df.groupby(['구성원', col], as_index=False)['금액'].sum()
+        
+        fig1 = px.pie(grouped, values='금액', names=col, hole=0.4, color_discrete_sequence=px.colors.qualitative.Pastel)
+        fig1.update_layout(margin=dict(t=5, b=5, l=5, r=5), showlegend=False, paper_bgcolor='rgba(0,0,0,0)')
+        st.plotly_chart(fig1, use_container_width=True)
+        
+        grouped['멤버총합'] = grouped.groupby('구성원')['금액'].transform('sum')
+        grouped['비중'] = grouped.apply(lambda x: (x['금액']/x['멤버총합']*100).round(1) if x['멤버총합'] > 0 else 0, axis=1)
+        grouped['라벨'] = grouped[col] + " " + grouped['비중'].astype(str) + "%"
+        
+        fig2 = px.bar(grouped, y='구성원', x='금액', color=col, orientation='h', text='라벨', color_discrete_sequence=px.colors.qualitative.Pastel)
+        fig2.update_layout(barmode='stack', barnorm='percent', margin=dict(t=5, b=5, l=5, r=5), showlegend=False, xaxis=dict(showticklabels=False), yaxis_title=None, paper_bgcolor='rgba(0,0,0,0)')
+        fig2.update_traces(textposition='inside')
+        st.plotly_chart(fig2, use_container_width=True)
+
+    tab1, tab2, tab3 = st.tabs(["💸 금융", "🏠 부동산/부채", "📦 기타"])
+    with tab1: draw_section(df[~df['대분류'].isin(['부동산', '기타', '부채'])], '대분류')
+    with tab2: draw_section(df[df['대분류'].isin(['부동산', '부채'])], '소분류')
+    with tab3: draw_section(df[df['대분류'] == '기타'], '소분류')
+
+    st.markdown("<div id='table'></div>", unsafe_allow_html=True)
+    st.subheader("📋 구성원별 자산 상세")
+
+    def style_total(row):
+        return ['background-color: #1d4ed8; color: #ffffff; font-weight: bold'] * len(row) if row['구성원'] == '💡 합계' else [''] * len(row)
+
+    m_list = ['전체'] + list(df['구성원'].unique())
+    tabs = st.tabs([f"👤 {m}" for m in m_list])
+    for i, tab in enumerate(tabs):
+        with tab:
+            target = df.copy() if m_list[i] == '전체' else df[df['구성원'] == m_list[i]].copy()
+            res_df = pd.concat([pd.DataFrame([{'구성원': '💡 합계', '대분류': '-', '소분류': '총 순자산', '금액': target['금액'].sum()}]), target], ignore_index=True)
+            st.dataframe(res_df.style.apply(style_total, axis=1).format({"금액": "{:,.0f}"}), use_container_width=True, hide_index=True)
+
+    st.write("<br><br><br>", unsafe_allow_html=True)
