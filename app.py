@@ -70,8 +70,17 @@ df = load_data()
 # --- 화면 렌더링 ---
 if not df.empty:
     st.markdown("<div id='summary'></div>", unsafe_allow_html=True)
+    
+    # 📸 최상단 헤더 이미지 추가
+    # 파일명은 깃허브에 올린 이름과 정확히 일치해야 합니다.
+    try:
+        st.image("family_photo.jpg", use_container_width=True)
+    except:
+        # 사진이 없을 경우를 대비한 안전장치
+        pass
+    
     st.title("👨‍👩‍👧 꼬뇽부부 자산 현황")
-    st.caption("새로고침 시 실시간 시세가 반영됩니다.")
+    st.caption("꼬뇽부부 화이팅!!")
     
     net_worth = df['금액'].sum()
     total_assets = df[df['금액'] > 0]['금액'].sum()
@@ -136,3 +145,4 @@ if not df.empty:
             st.dataframe(res_df.style.apply(style_total, axis=1).format({"금액": "{:,.0f}"}), use_container_width=True, hide_index=True)
 
     st.write("<br><br><br>", unsafe_allow_html=True)
+
