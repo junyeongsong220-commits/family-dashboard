@@ -1,66 +1,41 @@
 import streamlit as st
 import pandas as pd
 import plotly.express as px
+import google.generativeai as genai # 👈 제미나이 소환!
 
 # 1. 페이지 설정
 st.set_page_config(page_title="가족 자산 대시보드", layout="centered")
 
-# --- 🎨 2. CSS (여백 및 컴팩트 디자인) ---
+# --- 🎨 2. CSS ---
 st.markdown("""
 <style>
-    .block-container {
-        padding-top: 1.5rem !important;
-        padding-bottom: 0rem !important;
-        padding-left: 1rem !important;
-        padding-right: 1rem !important;
-    }
+    .block-container { padding-top: 1.5rem !important; padding-bottom: 0rem !important; padding-left: 1rem !important; padding-right: 1rem !important; }
     header { visibility: hidden; height: 0px; }
-    
-    img {
-        border-radius: 20px;
-        margin-bottom: 10px;
-        box-shadow: 0 4px 10px rgba(0,0,0,0.1);
-    }
-
-    .main-title {
-        font-size: 1.4rem !important;
-        font-weight: 800;
-        margin-bottom: 2px;
-        color: #31333F;
-    }
+    img { border-radius: 20px; margin-bottom: 10px; box-shadow: 0 4px 10px rgba(0,0,0,0.1); }
+    .main-title { font-size: 1.4rem !important; font-weight: 800; margin-bottom: 2px; color: #31333F; }
     @media (prefers-color-scheme: dark) { .main-title { color: #ffffff; } }
-
-    div[data-testid="metric-container"] { 
-        background-color: #f8f9fa; 
-        border: 1px solid #e9ecef; 
-        padding: 8px 4px !important; 
-        border-radius: 12px; 
-    }
-    
-    @media (prefers-color-scheme: dark) {
-        div[data-testid="metric-container"] { background-color: #262730 !important; border: 1px solid #414141 !important; }
-    }
-
+    div[data-testid="metric-container"] { background-color: #f8f9fa; border: 1px solid #e9ecef; padding: 8px 4px !important; border-radius: 12px; }
+    @media (prefers-color-scheme: dark) { div[data-testid="metric-container"] { background-color: #262730 !important; border: 1px solid #414141 !important; } }
     [data-testid="stMetricValue"] { font-size: 0.95rem !important; font-weight: 700 !important; }
     [data-testid="stMetricLabel"] { font-size: 0.7rem !important; }
-
-    /* 하단 네비게이션 */
-    .floating-nav {
-        position: fixed; bottom: 15px; left: 50%; transform: translateX(-50%);
-        background-color: rgba(255, 255, 255, 0.95); backdrop-filter: blur(8px); padding: 8px 18px; border-radius: 25px;
-        box-shadow: 0 4px 12px rgba(0,0,0,0.15); display: flex; gap: 15px; z-index: 1000; border: 1px solid #eee;
-    }
+    .floating-nav { position: fixed; bottom: 15px; left: 50%; transform: translateX(-50%); background-color: rgba(255, 255, 255, 0.95); backdrop-filter: blur(8px); padding: 8px 18px; border-radius: 25px; box-shadow: 0 4px 12px rgba(0,0,0,0.15); display: flex; gap: 15px; z-index: 1000; border: 1px solid #eee; }
     .floating-nav a { text-decoration: none; color: #555; font-size: 0.8rem; font-weight: 600; }
+    .goal-text { font-size: 1.2rem; font-weight: bold; color: #1f77b4; margin-bottom: 10px; }
+    @media (prefers-color-scheme: dark) { .goal-text { color: #4facfe; } }
 </style>
 <div class="floating-nav">
     <a href="#summary">💰 요약</a> <a href="#charts">📊 구성</a> <a href="#table">📋 상세</a>
 </div>
 """, unsafe_allow_html=True)
 
-# --- 🔑 3. 데이터 로직 ---
+# --- 🔑 3. 데이터 및 API 설정 ---
 try:
     SHEET_ID = st.secrets["SHEET_ID"].strip()
     SHEET_GID = st.secrets["SHEET_GID"].strip()
+    GEMINI_API_KEY = st.secrets.get("GEMINI_API_KEY", "").strip()
+    
+    if GEMINI_API_KEY:
+        genai.configure(api_key=GEMINI_API_KEY)
 except:
     st.error("Secrets 설정을 확인해주세요!")
     st.stop()
@@ -84,98 +59,139 @@ def load_data():
         df.loc[df['대분류'] == '부채', '금액'] = df.loc[df['대분류'] == '부채', '금액'].abs() * -1
         return df
     except Exception as e:
-        st.error(f"데이터 로드 실패: {e}")
         return pd.DataFrame()
 
 df = load_data()
 
 # --- 🚀 4. 메인 화면 ---
 if not df.empty:
-    st.markdown("<div id='summary'></div>", unsafe_allow_html=True)
-    try:
-        st.image("family_photo.jpg", use_container_width=True)
-    except:
-        pass
+    try: st.image("family_photo.jpg", use_container_width=True)
+    except: pass
 
-    st.markdown('<p class="main-title">👨‍👩‍👧 Family Asset Monitor</p>', unsafe_allow_html=True)
+    st.markdown('<p class="main-title">🏠 Family Assest Monitor</p>', unsafe_allow_html=True)
     
     net_worth = df['금액'].sum()
     total_assets = df[df['금액'] > 0]['금액'].sum()
     total_debts = df[df['금액'] < 0]['금액'].sum()
 
-    show_assets = st.toggle("👀 금액 보기", value=False)
-    col1, col2, col3 = st.columns(3)
-    if show_assets:
-        col1.metric("💎 순자산", format_krw(net_worth))
-        col2.metric("💰 총 자산", format_krw(total_assets))
-        col3.metric("💸 총 부채", format_krw(total_debts))
-    else:
-        col1.metric("💎 순자산", "👆 클릭하여 확인하기")
-        col2.metric("💰 총 자산", "👆 클릭하여 확인하기")
-        col3.metric("💸 총 부채", "👆 클릭하여 확인하기")
-        
-    st.divider()
+    main_tab1, main_tab2 = st.tabs(["📊 현재 자산 현황", "🚀 목표 및 AI 분석"])
 
-    # --- 📊 5. 차트 섹션 ---
-    st.markdown("<div id='charts'></div>", unsafe_allow_html=True)
-    st.subheader("📊 포트폴리오 구성")
-
-    def draw_section(data, col):
-        if data.empty or data['금액'].abs().sum() == 0:
-            return st.info("데이터가 없습니다.")
-        
-        plot_df = data.copy()
-        plot_df['금액'] = plot_df['금액'].abs()
-        grouped = plot_df.groupby(['구성원', col], as_index=False)['금액'].sum()
-        
-        fig1 = px.pie(grouped, values='금액', names=col, hole=0.5, 
-                     color_discrete_sequence=px.colors.qualitative.Pastel)
-        fig1.update_traces(textinfo='label+percent', textposition='inside', textfont_size=10)
-        fig1.update_layout(height=280, margin=dict(t=20, b=20, l=10, r=10), showlegend=False, paper_bgcolor='rgba(0,0,0,0)')
-        st.plotly_chart(fig1, use_container_width=True)
-        
-        grouped['멤버총합'] = grouped.groupby('구성원')['금액'].transform('sum')
-        grouped['비중'] = grouped.apply(lambda x: round((x['금액']/x['멤버총합']*100), 1) if x['멤버총합'] > 0 else 0, axis=1)
-        grouped['라벨'] = grouped[col] + " " + grouped['비중'].astype(str) + "%"
-        
-        fig2 = px.bar(grouped, y='구성원', x='금액', color=col, orientation='h', 
-                     text='라벨', color_discrete_sequence=px.colors.qualitative.Pastel)
-        fig2.update_layout(height=180, barmode='stack', barnorm='percent', margin=dict(t=10, b=10, l=10, r=10), showlegend=False, xaxis=dict(showticklabels=False), yaxis_title=None, paper_bgcolor='rgba(0,0,0,0)')
-        fig2.update_traces(textposition='inside', textfont_size=10)
-        st.plotly_chart(fig2, use_container_width=True)
-
-    tab1, tab2, tab3 = st.tabs(["💸 금융", "🏠 부동산", "📦 기타"])
-    with tab1: draw_section(df[~df['대분류'].isin(['부동산', '기타', '부채'])], '대분류')
-    with tab2: draw_section(df[df['대분류'].isin(['부동산', '부채'])], '소분류')
-    with tab3: draw_section(df[df['대분류'] == '기타'], '소분류')
-
-    # --- 📋 6. 상세 내역 (합계 추가 & 테마 반응형 색상) ---
-    st.markdown("<div id='table'></div>", unsafe_allow_html=True)
-    st.subheader("📋 구성원별 상세")
-
-    # 💡 다크/라이트 모드 모두에 어울리는 반투명 하이라이트 스타일
-    def style_total(row):
-        if row['대분류'] == '💡 합계':
-            return ['background-color: rgba(130, 130, 130, 0.2); font-weight: bold;'] * len(row)
-        return [''] * len(row)
-
-    m_list = ['전체'] + list(df['구성원'].unique())
-    tabs = st.tabs([f"👤 {m}" for m in m_list])
-    for i, tab in enumerate(tabs):
-        with tab:
-            target = df.copy() if m_list[i] == '전체' else df[df['구성원'] == m_list[i]].copy()
+    # ==========================================
+    # 탭 1. 기존 대시보드 화면 
+    # ==========================================
+    with main_tab1:
+        st.markdown("<div id='summary'></div>", unsafe_allow_html=True)
+        show_assets = st.toggle("👀 금액 보기", value=False)
+        col1, col2, col3 = st.columns(3)
+        if show_assets:
+            col1.metric("💎 순자산", format_krw(net_worth))
+            col2.metric("💰 총 자산", format_krw(total_assets))
+            col3.metric("💸 총 부채", format_krw(total_debts))
+        else:
+            col1.metric("💎 순자산", "👆 토글 켜기")
+            col2.metric("💰 총 자산", "👆 토글 켜기")
+            col3.metric("💸 총 부채", "👆 토글 켜기")
             
-            # 합계 행 만들기
-            total_row = pd.DataFrame([{'대분류': '💡 합계', '소분류': '총 순자산', '금액': target['금액'].sum()}])
-            
-            # 합계 행을 기존 데이터 맨 위에 합치기
-            res_df = pd.concat([total_row, target[['대분류', '소분류', '금액']]], ignore_index=True)
-            
-            # 스타일을 적용하여 표 출력
-            st.dataframe(
-                res_df.style.apply(style_total, axis=1).format({"금액": "{:,.0f}"}), 
-                use_container_width=True, 
-                hide_index=True
-            )
+        st.divider()
 
-    st.write("<br><br><br>", unsafe_allow_html=True)
+        st.markdown("<div id='charts'></div>", unsafe_allow_html=True)
+        st.subheader("📊 포트폴리오 구성")
+
+        def draw_section(data, col):
+            if data.empty or data['금액'].abs().sum() == 0: return st.info("데이터가 없습니다.")
+            plot_df = data.copy()
+            plot_df['금액'] = plot_df['금액'].abs()
+            grouped = plot_df.groupby(['구성원', col], as_index=False)['금액'].sum()
+            
+            fig1 = px.pie(grouped, values='금액', names=col, hole=0.5, color_discrete_sequence=px.colors.qualitative.Pastel)
+            fig1.update_traces(textinfo='label+percent', textposition='inside', textfont_size=10)
+            fig1.update_layout(height=280, margin=dict(t=20, b=20, l=10, r=10), showlegend=False, paper_bgcolor='rgba(0,0,0,0)')
+            st.plotly_chart(fig1, use_container_width=True)
+            
+            grouped['멤버총합'] = grouped.groupby('구성원')['금액'].transform('sum')
+            grouped['비중'] = grouped.apply(lambda x: round((x['금액']/x['멤버총합']*100), 1) if x['멤버총합'] > 0 else 0, axis=1)
+            grouped['라벨'] = grouped[col] + " " + grouped['비중'].astype(str) + "%"
+            
+            fig2 = px.bar(grouped, y='구성원', x='금액', color=col, orientation='h', text='라벨', color_discrete_sequence=px.colors.qualitative.Pastel)
+            fig2.update_layout(height=180, barmode='stack', barnorm='percent', margin=dict(t=10, b=10, l=10, r=10), showlegend=False, xaxis=dict(showticklabels=False), yaxis_title=None, paper_bgcolor='rgba(0,0,0,0)')
+            fig2.update_traces(textposition='inside', textfont_size=10)
+            st.plotly_chart(fig2, use_container_width=True)
+
+        tab_sub1, tab_sub2, tab_sub3 = st.tabs(["💸 금융", "🏠 부동산", "📦 기타"])
+        with tab_sub1: draw_section(df[~df['대분류'].isin(['부동산', '기타', '부채'])], '대분류')
+        with tab_sub2: draw_section(df[df['대분류'].isin(['부동산', '부채'])], '소분류')
+        with tab_sub3: draw_section(df[df['대분류'] == '기타'], '소분류')
+
+        st.markdown("<div id='table'></div>", unsafe_allow_html=True)
+        st.subheader("📋 구성원별 상세")
+
+        def style_total(row):
+            if row['대분류'] == '💡 합계': return ['background-color: rgba(130, 130, 130, 0.2); font-weight: bold;'] * len(row)
+            return [''] * len(row)
+
+        m_list = ['전체'] + list(df['구성원'].unique())
+        tabs_table = st.tabs([f"👤 {m}" for m in m_list])
+        for i, t in enumerate(tabs_table):
+            with t:
+                target = df.copy() if m_list[i] == '전체' else df[df['구성원'] == m_list[i]].copy()
+                total_row = pd.DataFrame([{'대분류': '💡 합계', '소분류': '총 순자산', '금액': target['금액'].sum()}])
+                res_df = pd.concat([total_row, target[['대분류', '소분류', '금액']]], ignore_index=True)
+                st.dataframe(res_df.style.apply(style_total, axis=1).format({"금액": "{:,.0f}"}), use_container_width=True, hide_index=True)
+        st.write("<br><br><br>", unsafe_allow_html=True)
+
+    # ==========================================
+    # 탭 2. 새로운 목표 설정 및 찐! AI 피드백
+    # ==========================================
+    with main_tab2:
+        st.subheader("🎯 우리의 재무 목표")
+        
+        target_eok = st.number_input("목표 순자산 (단위: 억원)", min_value=1, value=10, step=1)
+        target_amount = target_eok * 100000000
+        
+        remaining = target_amount - net_worth
+        progress_ratio = max(0.0, min(net_worth / target_amount, 1.0))
+        
+        st.markdown("<br>", unsafe_allow_html=True)
+        if remaining > 0:
+            st.markdown(f'<div class="goal-text">🔥 경제적 자유 {target_eok}억 까지!<br>앞으로 {format_krw(remaining)} 남았습니다.</div>', unsafe_allow_html=True)
+        else:
+            st.markdown(f'<div class="goal-text">🎉 축하합니다!<br>목표하신 경제적 자유 {target_eok}억을 돌파했습니다!</div>', unsafe_allow_html=True)
+            
+        st.progress(progress_ratio)
+        st.caption(f"현재 달성률: {progress_ratio * 100:.1f}%")
+        
+        st.divider()
+        st.subheader("🤖 AI 재무 비서 피드백")
+
+        if not GEMINI_API_KEY:
+            st.warning("스트림릿 Secrets에 `GEMINI_API_KEY`를 설정하면 AI의 분석을 받을 수 있습니다!")
+        else:
+            if st.button("✨ 제미나이에게 현재 자산 분석 맡기기"):
+                with st.spinner("자산 포트폴리오를 꼼꼼히 분석하고 있습니다..."):
+                    try:
+                        # 자산 데이터를 요약하여 제미나이에게 보낼 프롬프트 작성
+                        asset_summary = df.groupby('대분류')['금액'].sum().to_dict()
+                        prompt = f"""
+                        당신은 우리 가족의 전속 프라이빗 뱅커(PB)입니다. 아래의 현재 자산 현황을 보고, 
+                        친절하고 전문적인 어투로 재무 상태를 분석하고 향후 방향성에 대해 3~4문장으로 짧고 명확하게 조언해 주세요.
+                        
+                        [현재 가족 자산 현황]
+                        - 총 자산: {total_assets:,}원
+                        - 총 부채: {abs(total_debts):,}원
+                        - 순자산: {net_worth:,}원
+                        - 자산 구성(대분류별): {asset_summary}
+                        - 현재 재무 목표: {target_eok}억원
+                        
+                        *응답 시 마크다운(볼드체 등)과 이모지를 적절히 사용하여 모바일에서 읽기 좋게 작성해 주세요.*
+                        """
+                        
+                        # 제미나이 모델 호출 (최신 flash 모델 권장)
+                        model = genai.GenerativeModel('gemini-1.5-flash')
+                        response = model.generate_content(prompt)
+                        
+                        st.success("분석이 완료되었습니다!")
+                        st.info(response.text)
+                    except Exception as e:
+                        st.error(f"API 호출 중 문제가 발생했습니다: {e}")
+            
+        st.write("<br><br><br>", unsafe_allow_html=True)
