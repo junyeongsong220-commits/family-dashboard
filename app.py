@@ -110,13 +110,13 @@ if not df.empty:
         col2.metric("💰 총 자산", format_krw(total_assets))
         col3.metric("💸 총 부채", format_krw(total_debts))
     else:
-        col1.metric("💎 순자산", "👆 클릭")
-        col2.metric("💰 총 자산", "👆 클릭")
-        col3.metric("💸 총 부채", "👆 클릭")
+        col1.metric("💎 순자산", "👆 클릭하여 확인하기")
+        col2.metric("💰 총 자산", "👆 클릭하여 확인하기")
+        col3.metric("💸 총 부채", "👆 클릭하여 확인하기")
         
     st.divider()
 
-    # --- 📊 5. 차트 섹션 (크기 및 레이블 수정) ---
+    # --- 📊 5. 차트 섹션 ---
     st.markdown("<div id='charts'></div>", unsafe_allow_html=True)
     st.subheader("📊 포트폴리오 구성")
 
@@ -128,34 +128,19 @@ if not df.empty:
         plot_df['금액'] = plot_df['금액'].abs()
         grouped = plot_df.groupby(['구성원', col], as_index=False)['금액'].sum()
         
-        # 1. 도넛 차트 수정 (레이블+퍼센트 표시 및 높이 축소)
         fig1 = px.pie(grouped, values='금액', names=col, hole=0.5, 
                      color_discrete_sequence=px.colors.qualitative.Pastel)
         fig1.update_traces(textinfo='label+percent', textposition='inside', textfont_size=10)
-        fig1.update_layout(
-            height=280, # 높이를 280으로 축소 (기본 약 450)
-            margin=dict(t=20, b=20, l=10, r=10), 
-            showlegend=False, 
-            paper_bgcolor='rgba(0,0,0,0)'
-        )
+        fig1.update_layout(height=280, margin=dict(t=20, b=20, l=10, r=10), showlegend=False, paper_bgcolor='rgba(0,0,0,0)')
         st.plotly_chart(fig1, use_container_width=True)
         
-        # 2. 바 차트 수정 (높이 축소)
         grouped['멤버총합'] = grouped.groupby('구성원')['금액'].transform('sum')
         grouped['비중'] = grouped.apply(lambda x: round((x['금액']/x['멤버총합']*100), 1) if x['멤버총합'] > 0 else 0, axis=1)
         grouped['라벨'] = grouped[col] + " " + grouped['비중'].astype(str) + "%"
         
         fig2 = px.bar(grouped, y='구성원', x='금액', color=col, orientation='h', 
                      text='라벨', color_discrete_sequence=px.colors.qualitative.Pastel)
-        fig2.update_layout(
-            height=180, # 높이를 180으로 축소
-            barmode='stack', barnorm='percent', 
-            margin=dict(t=10, b=10, l=10, r=10), 
-            showlegend=False, 
-            xaxis=dict(showticklabels=False), 
-            yaxis_title=None, 
-            paper_bgcolor='rgba(0,0,0,0)'
-        )
+        fig2.update_layout(height=180, barmode='stack', barnorm='percent', margin=dict(t=10, b=10, l=10, r=10), showlegend=False, xaxis=dict(showticklabels=False), yaxis_title=None, paper_bgcolor='rgba(0,0,0,0)')
         fig2.update_traces(textposition='inside', textfont_size=10)
         st.plotly_chart(fig2, use_container_width=True)
 
@@ -164,16 +149,33 @@ if not df.empty:
     with tab2: draw_section(df[df['대분류'].isin(['부동산', '부채'])], '소분류')
     with tab3: draw_section(df[df['대분류'] == '기타'], '소분류')
 
-    # --- 📋 6. 상세 내역 ---
+    # --- 📋 6. 상세 내역 (합계 추가 & 테마 반응형 색상) ---
     st.markdown("<div id='table'></div>", unsafe_allow_html=True)
     st.subheader("📋 구성원별 상세")
+
+    # 💡 다크/라이트 모드 모두에 어울리는 반투명 하이라이트 스타일
+    def style_total(row):
+        if row['대분류'] == '💡 합계':
+            return ['background-color: rgba(130, 130, 130, 0.2); font-weight: bold;'] * len(row)
+        return [''] * len(row)
 
     m_list = ['전체'] + list(df['구성원'].unique())
     tabs = st.tabs([f"👤 {m}" for m in m_list])
     for i, tab in enumerate(tabs):
         with tab:
             target = df.copy() if m_list[i] == '전체' else df[df['구성원'] == m_list[i]].copy()
-            st.dataframe(target[['대분류', '소분류', '금액']].style.format({"금액": "{:,.0f}"}), 
-                         use_container_width=True, hide_index=True)
+            
+            # 합계 행 만들기
+            total_row = pd.DataFrame([{'대분류': '💡 합계', '소분류': '총 순자산', '금액': target['금액'].sum()}])
+            
+            # 합계 행을 기존 데이터 맨 위에 합치기
+            res_df = pd.concat([total_row, target[['대분류', '소분류', '금액']]], ignore_index=True)
+            
+            # 스타일을 적용하여 표 출력
+            st.dataframe(
+                res_df.style.apply(style_total, axis=1).format({"금액": "{:,.0f}"}), 
+                use_container_width=True, 
+                hide_index=True
+            )
 
     st.write("<br><br><br>", unsafe_allow_html=True)
