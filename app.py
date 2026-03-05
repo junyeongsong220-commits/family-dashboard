@@ -4,11 +4,12 @@ import plotly.express as px
 import google.generativeai as genai
 import time
 import datetime
+import pytz # 👈 시간 계산을 위해 추가
 
 # 1. 페이지 설정
 st.set_page_config(page_title="가족 자산 대시보드", layout="centered")
 
-# --- 🎨 2. CSS ---
+# --- 🎨 2. CSS (기존 스타일 유지) ---
 st.markdown("""
 <style>
     .block-container { padding-top: 1.5rem !important; padding-bottom: 0rem !important; padding-left: 1rem !important; padding-right: 1rem !important; }
@@ -35,7 +36,6 @@ st.markdown("""
 try:
     SHEET_ID = st.secrets["SHEET_ID"].strip()
     SHEET_GID = st.secrets["SHEET_GID"].strip()
-    # 🚨 주의: HISTORY_GID가 Secrets에 없으면 과거 데이터를 못 가져옵니다!
     HISTORY_GID = st.secrets.get("HISTORY_GID", "").strip() 
     GEMINI_API_KEY = st.secrets.get("GEMINI_API_KEY", "").strip()
     
@@ -66,17 +66,30 @@ def load_data():
     except Exception as e:
         return pd.DataFrame()
 
+# 💡 마지막 업데이트 시간을 G1 셀에서 가져오는 함수
+@st.cache_data(ttl=60)
+def get_last_update_info():
+    url = f"https://docs.google.com/spreadsheets/d/{SHEET_ID}/export?format=csv&gid={SHEET_GID}&range=G1:G1"
+    try:
+        # 헤더가 없으므로 header=None으로 읽기
+        time_df = pd.read_csv(url, header=None)
+        if not time_df.empty:
+            return str(time_df.iloc[0, 0])
+        return None
+    except:
+        return None
+
 @st.cache_data(ttl=60)
 def load_history_data(gid):
     url = f"https://docs.google.com/spreadsheets/d/{SHEET_ID}/export?format=csv&gid={gid}"
     try:
-        # 3행을 헤더로 사용하기 위해 위쪽 2줄 무시
         df = pd.read_csv(url, skiprows=2) 
         return df
     except Exception as e:
         return pd.DataFrame()
 
 df = load_data()
+last_update_str = get_last_update_info()
 
 # --- 🚀 4. 메인 화면 ---
 
@@ -84,20 +97,45 @@ FAMILY_IMAGE_BASE64 = """4SGoRXhpZgAATU0AKgAAAAgADAEPAAIAAAAGAAAAngEQAAIAAAAKAAA
 
 if not df.empty:
     try: 
-        if FAMILY_IMAGE_BASE64 != """4SGoRXhpZgAATU0AKgAAAAgADAEPAAIAAAAGAAAAngEQAAIAAAAKAAAApAESAAMAAAABAAEAAAEaAAUAAAABAAAArgEbAAUAAAABAAAAtgEoAAMAAAABAAIAAAExAAIAAAAFAAAAvgEyAAIAAAAUAAAAxAE8AAIAAAAKAAAA2AITAAMAAAABAAEAAIdpAAQAAAABAAAA4oglAAQAAAABAAAJygAACwJBcHBsZQBpUGhvbmUgMTQAAAAASAAAAAEAAABIAAAAATE4LjUAADIwMjU6MDg6MjMgMTc6MzI6MjcAaVBob25lIDE0AAAjgpoABQAAAAEAAAKMgp0ABQAAAAEAAAKUiCIAAwAAAAEAAgAAiCcAAwAAAAEAMgAAkAAABwAAAAQwMjMykAMAAgAAABQAAAKckAQAAgAAABQAAAKwkBAAAgAAAAcAAALEkBEAAgAAAAcAAALMkBIAAgAAAAcAAALUkQEABwAAAAQBAgMAkgEACgAAAAEAAALckgIABQAAAAEAAALkkgMACgAAAAEAAALskgQACgAAAAEAAAL0kgcAAwAAAAEABQAAkgkAAwAAAAEAEAAAkgoABQAAAAEAAAL8knwABwAABnEAAAMEkpEAAgAAAAQ2NDAAkpIAAgAAAAQ2NDAAoAAABwAAAAQwMTAwoAEAAwAAAAH""":
+        if FAMILY_IMAGE_BASE64 != "":
             st.image(f"data:image/jpeg;base64,{FAMILY_IMAGE_BASE64}", use_container_width=True)
         else:
-            # 텍스트가 없으면 원래 하던 대로 사진 파일을 찾습니다.
             st.image("family_photo.jpg", use_container_width=True)
     except Exception as e:
         st.error(f"🚨 이미지 에러 발생: {e}")
 
-    # --- 🔄 제목 및 새로고침 버튼 레이아웃 ---
-    head_col1, head_col2 = st.columns([0.85, 0.15])
+    # --- 🔄 제목 및 상태 표시 레이아웃 ---
+    # st.metric을 제목 옆에 배치하기 위해 컬럼 비율 조정
+    head_col1, head_col2, head_col3 = st.columns([0.55, 0.3, 0.15])
+    
     with head_col1:
         st.markdown('<p class="main-title">🏠 Family Asset Monitor</p>', unsafe_allow_html=True)
+    
     with head_col2:
-        if st.button("🔄 Update now"):
+        # 💡 "몇 분 전 업데이트" 계산 로직
+        status_text = "확인 불가"
+        delta_color = "off"
+        
+        if last_update_str:
+            try:
+                kst = pytz.timezone('Asia/Seoul')
+                now_kst = datetime.datetime.now(kst)
+                last_update_dt = kst.localize(datetime.datetime.strptime(last_update_str, '%Y-%m-%d %H:%M:%S'))
+                
+                diff_min = int((now_kst - last_update_dt).total_seconds() // 60)
+                
+                if diff_min < 1: status_text = "방금 전"
+                elif diff_min < 60: status_text = f"{diff_min}분 전"
+                else: status_text = f"{diff_min // 60}시간 전"
+                
+                delta_color = "normal" if diff_min < 70 else "inverse" # 1시간 넘게 업데이트 안되면 주황색 표시
+            except:
+                pass
+        
+        st.metric(label="업데이트 상태", value=status_text, delta="LIVE", delta_color=delta_color)
+
+    with head_col3:
+        if st.button("🔄"):
             st.cache_data.clear()
             with st.spinner(""):
                 time.sleep(0.5)
@@ -111,46 +149,32 @@ if not df.empty:
     prev_net_worth = 0
     delta_val = 0
     
-    if HISTORY_GID: # Secrets에 HISTORY_GID가 제대로 입력되어 있어야만 작동!
+    if HISTORY_GID:
         history_df = load_history_data(HISTORY_GID)
-        
         if not history_df.empty:
             current_month = datetime.datetime.now().month
             prev_month = current_month - 1
-            
-            # 현재가 3월이면 "2월" 열을 찾음 (만약 1월이면 일단 1월을 참조하도록 방어)
             target_col_name = f"{prev_month}월" if prev_month > 0 else "1월"
-            
-            # '순자산'이라는 단어가 포함된 행(row)을 찾음
             target_row = history_df[history_df.apply(lambda row: row.astype(str).str.contains('순자산').any(), axis=1)]
             
             if not target_row.empty and target_col_name in history_df.columns:
                 val_str = str(target_row[target_col_name].values[0])
-                # 숫자 외의 문자(콤마, 원 등) 제거
                 val_clean = val_str.replace(',', '').replace('₩', '').replace('원', '').strip()
                 prev_net_worth = pd.to_numeric(val_clean, errors='coerce')
-                
-                if pd.isna(prev_net_worth): 
-                    prev_net_worth = 0
+                if pd.isna(prev_net_worth): prev_net_worth = 0
             
             if prev_net_worth > 0:
                 delta_val = net_worth - prev_net_worth
-    # ---------------------------------------------
 
     main_tab1, main_tab2 = st.tabs(["📊 현재 자산 현황", "🚀 목표 및 AI 분석"])
 
-    # ==========================================
-    # 탭 1. 기존 대시보드 화면 
-    # ==========================================
     with main_tab1:
         st.markdown("<div id='summary'></div>", unsafe_allow_html=True)
         show_assets = st.toggle("👀 금액 상세 보기", value=False)
         col1, col2, col3 = st.columns(3)
         if show_assets:
-            # 💡 순자산 메트릭에 delta(변동폭) 적용!
             delta_text = f"{delta_val/10000:,.0f}만 (전월 대비)" if delta_val != 0 else None
             col1.metric("💎 순자산", format_krw(net_worth), delta=delta_text)
-            
             col2.metric("💰 총 자산", format_krw(total_assets))
             col3.metric("💸 총 부채", format_krw(total_debts))
         else:
@@ -205,15 +229,10 @@ if not df.empty:
                 st.dataframe(res_df.style.apply(style_total, axis=1).format({"금액": "{:,.0f}"}), use_container_width=True, hide_index=True)
         st.write("<br><br><br>", unsafe_allow_html=True)
 
-    # ==========================================
-    # 탭 2. 새로운 목표 설정 및 찐! AI 피드백
-    # ==========================================
     with main_tab2:
         st.subheader("🎯 우리의 재무 목표")
-        
         target_eok = st.number_input("목표 순자산 (단위: 억원)", min_value=1, value=30, step=1)
         target_amount = target_eok * 100000000
-        
         remaining = target_amount - net_worth
         progress_ratio = max(0.0, min(net_worth / target_amount, 1.0))
         
@@ -237,43 +256,14 @@ if not df.empty:
                     try:
                         asset_summary = df.groupby('대분류')['금액'].sum().to_dict()
                         prompt = f"""
-                        당신은 우리 가족의 전속 프라이빗 뱅커(PB)입니다. 아래의 실시간 자산 데이터를 바탕으로, 모바일 화면에서 읽기 쉽도록 줄바꿈을 적극적으로 활용하여 구체적이고 전문적인 분석 리포트를 작성해 주세요.
-
-                        [현재 가족 자산 현황]
-                        - 총 자산: {total_assets:,}원
-                        - 총 부채: {abs(total_debts):,}원
-                        - 순자산: {net_worth:,}원
-                        - 자산 구성(대분류별): {asset_summary}
-                        - 현재 경제적 자유 목표: {target_eok}억원
-
-                        [출력 형식 가이드라인]
-                        반드시 아래의 3가지 섹션으로 나누고, 각 섹션마다 줄바꿈(엔터)을 2번씩 넣어 단락을 확실히 구분해 주세요.
-
-                        1. 📊 현재 재무 상태 요약
-                        (순자산과 부채 비율을 바탕으로 현재의 건전성을 2~3문장으로 평가)
-
-                        2. 🔍 포트폴리오 정밀 분석
-                        (자산 구성 데이터를 보고, 특정 자산에 치우쳐 있는지, 위험도나 유동성은 어떤지 구체적으로 분석)
-
-                        3. 💡 목표 달성을 위한 액션 플랜
-                        ({target_eok}억 목표 달성을 위해 지금 당장 가족이 실천해야 할 구체적인 조언 2가지)
-                        
-                        *주의: 친절하고 격려하는 톤을 유지하되, 마크다운(볼드체)과 이모지를 적절히 사용하여 가독성을 극대화하세요.*
+                        당신은 우리 가족의 전속 프라이빗 뱅커(PB)입니다. 아래의 실시간 자산 데이터를 바탕으로 분석 리포트를 작성해 주세요.
+                        [데이터] 총자산 {total_assets:,}원, 부채 {abs(total_debts):,}원, 순자산 {net_worth:,}원. 목표 {target_eok}억.
                         """
-                        
-                        valid_models = [m.name for m in genai.list_models() if 'generateContent' in m.supported_generation_methods]
-                        chosen_model = next((m for m in valid_models if 'flash' in m), valid_models[0])
-                        
-                        model = genai.GenerativeModel(chosen_model)
+                        model = genai.GenerativeModel('gemini-1.5-flash')
                         response = model.generate_content(prompt)
-                        
                         st.success("분석이 완료되었습니다!")
                         st.info(response.text)
                     except Exception as e:
                         st.error(f"API 호출 중 문제가 발생했습니다: {e}")
             
         st.write("<br><br><br>", unsafe_allow_html=True)
-
-
-
-
