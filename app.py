@@ -82,7 +82,7 @@ if not df.empty:
         st.markdown('<p class="main-title">🏠 Family Asset Monitor</p>', unsafe_allow_html=True)
     with head_col2:
         # 버튼을 누르면 캐시를 비우고 앱을 다시 실행합니다.
-        if st.button("🔄"):
+        if st.button("🔄 Update now"):
             st.cache_data.clear()
             with st.spinner(""):
                 time.sleep(0.5)
@@ -225,4 +225,5 @@ if not df.empty:
                         st.error(f"API 호출 중 문제가 발생했습니다: {e}")
             
         st.write("<br><br><br>", unsafe_allow_html=True)
+
 
