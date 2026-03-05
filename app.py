@@ -81,23 +81,22 @@ df = load_data()
 # --- 🚀 4. 메인 화면 ---
 
 # 💡 1. 엑박 방지용 Base64 이미지 변수 (아까 변환한 엄청 긴 텍스트를 따옴표 3개 사이에 넣으세요!)
-FAMILY_IMAGE_BASE64 = """4SGoRXhpZgAATU0AKgAAAAgADAEPAAIAAAAGAAAAngEQAAIAAAAKAAAApAESAAMAAAABAAEAAAEaAAUAAAABAAAArgEbAAUAAAABAAAAtgEoAAMAAAABAAIAAAExAAIAAAAFAAAAvgEyAAIAAAAUAAAAxAE8AAIAAAAKAAAA2AITAAMAAAABAAEAAIdpAAQAAAABAAAA4oglAAQAAAABAAAJygAACwJBcHBsZQBpUGhvbmUgMTQAAAAASAAAAAEAAABIAAAAATE4LjUAADIwMjU6MDg6MjMgMTc6MzI6MjcAaVBob25lIDE0AAAjgpoABQAAAAEAAAKMgp0ABQAAAAEAAAKUiCIAAwAAAAEAAgAAiCcAAwAAAAEAMgAAkAAABwAAAAQwMjMykAMAAgAAABQAAAKckAQAAgAAABQAAAKwkBAAAgAAAAcAAALEkBEAAgAAAAcAAALMkBIAAgAAAAcAAALUkQEABwAAAAQBAgMAkgEACgAAAAEAAALckgIABQAAAAEAAALkkgMACgAAAAEAAALskgQACgAAAAEAAAL0kgcAAwAAAAEABQAAkgkAAwAAAAEAEAAAkgoABQAAAAEAAAL8knwABwAABnEAAAMEkpEAAgAAAAQ2NDAAkpIAAgAAAAQ2NDAAoAAABwAAAAQwMTAwoAEAAwAAAAH"""
 
 if not df.empty:
     try: 
-        # Base64 텍스트가 제대로 들어갔다면 이 부분에서 사진이 뜹니다.
-        if FAMILY_IMAGE_BASE64 != """여기에_BASE64_텍스트를_붙여넣으세요""":
+        if FAMILY_IMAGE_BASE64 != """4SGoRXhpZgAATU0AKgAAAAgADAEPAAIAAAAGAAAAngEQAAIAAAAKAAAApAESAAMAAAABAAEAAAEaAAUAAAABAAAArgEbAAUAAAABAAAAtgEoAAMAAAABAAIAAAExAAIAAAAFAAAAvgEyAAIAAAAUAAAAxAE8AAIAAAAKAAAA2AITAAMAAAABAAEAAIdpAAQAAAABAAAA4oglAAQAAAABAAAJygAACwJBcHBsZQBpUGhvbmUgMTQAAAAASAAAAAEAAABIAAAAATE4LjUAADIwMjU6MDg6MjMgMTc6MzI6MjcAaVBob25lIDE0AAAjgpoABQAAAAEAAAKMgp0ABQAAAAEAAAKUiCIAAwAAAAEAAgAAiCcAAwAAAAEAMgAAkAAABwAAAAQwMjMykAMAAgAAABQAAAKckAQAAgAAABQAAAKwkBAAAgAAAAcAAALEkBEAAgAAAAcAAALMkBIAAgAAAAcAAALUkQEABwAAAAQBAgMAkgEACgAAAAEAAALckgIABQAAAAEAAALkkgMACgAAAAEAAALskgQACgAAAAEAAAL0kgcAAwAAAAEABQAAkgkAAwAAAAEAEAAAkgoABQAAAAEAAAL8knwABwAABnEAAAMEkpEAAgAAAAQ2NDAAkpIAAgAAAAQ2NDAAoAAABwAAAAQwMTAwoAEAAwAAAAH""":
             st.image(f"data:image/jpeg;base64,{FAMILY_IMAGE_BASE64}", use_container_width=True)
         else:
-            st.image("family_photo.jpg", use_container_width=True) # 텍스트 안 넣었을 때 임시용
-    except: pass
+            st.image("family_photo.jpg", use_container_width=True)
+    except Exception as e:
+        st.error(f"🚨 이미지 에러 발생: {e}") # 범인의 정체를 화면에 빨간 글씨로 띄웁니다!
 
     # --- 🔄 제목 및 새로고침 버튼 레이아웃 ---
     head_col1, head_col2 = st.columns([0.85, 0.15])
     with head_col1:
         st.markdown('<p class="main-title">🏠 Family Asset Monitor</p>', unsafe_allow_html=True)
     with head_col2:
-        if st.button("🔄"):
+        if st.button("🔄Update now"):
             st.cache_data.clear()
             with st.spinner(""):
                 time.sleep(0.5)
@@ -273,3 +272,4 @@ if not df.empty:
                         st.error(f"API 호출 중 문제가 발생했습니다: {e}")
             
         st.write("<br><br><br>", unsafe_allow_html=True)
+
