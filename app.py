@@ -265,7 +265,7 @@ if not df.empty:
                         당신은 우리 가족의 전속 프라이빗 뱅커(PB)입니다. 아래의 실시간 자산 데이터를 바탕으로 분석 리포트를 작성해 주세요.
                         [데이터] 총자산 {total_assets:,}원, 부채 {abs(total_debts):,}원, 순자산 {net_worth:,}원. 목표 {target_eok}억.
                         """
-                        model = genai.GenerativeModel('gemini-1.5-flash')
+                        model = genai.GenerativeModel('gemini-3-pro-preview')
                         response = model.generate_content(prompt)
                         st.success("분석이 완료되었습니다!")
                         st.info(response.text)
@@ -273,3 +273,4 @@ if not df.empty:
                         st.error(f"API 호출 중 문제가 발생했습니다: {e}")
             
         st.write("<br><br><br>", unsafe_allow_html=True)
+
