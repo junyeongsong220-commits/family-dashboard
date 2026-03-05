@@ -97,7 +97,7 @@ if not df.empty:
     with head_col1:
         st.markdown('<p class="main-title">🏠 Family Asset Monitor</p>', unsafe_allow_html=True)
     with head_col2:
-        if st.button("🔄Update now"):
+        if st.button("🔄 Update now"):
             st.cache_data.clear()
             with st.spinner(""):
                 time.sleep(0.5)
@@ -273,6 +273,7 @@ if not df.empty:
                         st.error(f"API 호출 중 문제가 발생했습니다: {e}")
             
         st.write("<br><br><br>", unsafe_allow_html=True)
+
 
 
 
