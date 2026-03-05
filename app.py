@@ -66,23 +66,23 @@ def load_data():
     except Exception as e:
         return pd.DataFrame()
 
-# 💡 마지막 업데이트 시간을 G1 셀에서 가져오는 함수
+# 💡 오류 수정 부분: 마지막 업데이트 시간을 G1 셀에서 정확하게 가져오는 함수
 @st.cache_data(ttl=60)
 def get_last_update_info():
-    # range 옵션을 빼고 시트 전체를 불러오도록 URL 수정
     url = f"https://docs.google.com/spreadsheets/d/{SHEET_ID}/export?format=csv&gid={SHEET_GID}"
     try:
-        # 첫 번째 줄(nrows=1)만 헤더 없이(header=None) 읽어옵니다.
-        time_df = pd.read_csv(url, header=None, nrows=1)
+        # header=None으로 읽어야 1행의 G1(시간) 데이터를 열 이름으로 무시하지 않습니다.
+        # nrows=1로 첫 줄만 빠르게 가져옵니다.
+        df_time = pd.read_csv(url, header=None, nrows=1)
         
         # G1 셀은 0번 행의 6번 열입니다 (A=0, B=1, C=2, D=3, E=4, F=5, G=6)
-        if not time_df.empty and len(time_df.columns) > 6:
-            val = time_df.iloc[0, 6]
-            if pd.isna(val): return None  # 셀이 비어있으면 None 반환
-            return str(val).strip()
+        if df_time.shape[1] > 6:
+            val = str(df_time.iloc[0, 6]).strip()
+            # 값이 'nan'이 아니고 날짜 형식(최소 10자 이상)인 경우만 반환
+            if val.lower() != 'nan' and len(val) >= 10:
+                return val
         return None
-    except Exception as e:
-        # 에러가 궁금하다면 주석 해제: st.write(f"시간 읽기 에러: {e}")
+    except:
         return None
 
 @st.cache_data(ttl=60)
@@ -95,7 +95,7 @@ def load_history_data(gid):
         return pd.DataFrame()
 
 df = load_data()
-last_update_str = get_last_update_info()
+last_update_str = get_last_update_info() # 시간 데이터 가져오기
 
 # --- 🚀 4. 메인 화면 ---
 
@@ -111,7 +111,6 @@ if not df.empty:
         st.error(f"🚨 이미지 에러 발생: {e}")
 
     # --- 🔄 제목 및 상태 표시 레이아웃 ---
-    # st.metric을 제목 옆에 배치하기 위해 컬럼 비율 조정
     head_col1, head_col2, head_col3 = st.columns([0.55, 0.3, 0.15])
     
     with head_col1:
@@ -126,6 +125,7 @@ if not df.empty:
             try:
                 kst = pytz.timezone('Asia/Seoul')
                 now_kst = datetime.datetime.now(kst)
+                # 시트에서 가져온 시간을 날짜 객체로 변환
                 last_update_dt = kst.localize(datetime.datetime.strptime(last_update_str, '%Y-%m-%d %H:%M:%S'))
                 
                 diff_min = int((now_kst - last_update_dt).total_seconds() // 60)
@@ -134,7 +134,7 @@ if not df.empty:
                 elif diff_min < 60: status_text = f"{diff_min}분 전"
                 else: status_text = f"{diff_min // 60}시간 전"
                 
-                delta_color = "normal" if diff_min < 70 else "inverse" # 1시간 넘게 업데이트 안되면 주황색 표시
+                delta_color = "normal" if diff_min < 70 else "inverse" # 1시간 넘게 업데이트 안되면 색상 변경
             except:
                 pass
         
@@ -273,5 +273,3 @@ if not df.empty:
                         st.error(f"API 호출 중 문제가 발생했습니다: {e}")
             
         st.write("<br><br><br>", unsafe_allow_html=True)
-
-
