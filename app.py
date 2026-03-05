@@ -2,6 +2,7 @@ import streamlit as st
 import pandas as pd
 import plotly.express as px
 import google.generativeai as genai
+import time
 
 # 1. 페이지 설정
 st.set_page_config(page_title="가족 자산 대시보드", layout="centered")
@@ -22,6 +23,8 @@ st.markdown("""
     .floating-nav a { text-decoration: none; color: #555; font-size: 0.8rem; font-weight: 600; }
     .goal-text { font-size: 1.2rem; font-weight: bold; color: #1f77b4; margin-bottom: 10px; }
     @media (prefers-color-scheme: dark) { .goal-text { color: #4facfe; } }
+    /* 새로고침 버튼 스타일 */
+    .stButton > button { width: 100%; border-radius: 12px; border: 1px solid #ddd; height: 38px; }
 </style>
 <div class="floating-nav">
     <a href="#summary">💰 요약</a> <a href="#charts">📊 구성</a> <a href="#table">📋 상세</a>
@@ -68,7 +71,17 @@ if not df.empty:
     try: st.image("family_photo.jpg", use_container_width=True)
     except: pass
 
-    st.markdown('<p class="main-title">🏠 Family Assest Monitor</p>', unsafe_allow_html=True)
+    # --- 🔄 제목 및 새로고침 버튼 레이아웃 ---
+    head_col1, head_col2 = st.columns([0.85, 0.15])
+    with head_col1:
+        st.markdown('<p class="main-title">🏠 Family Asset Monitor</p>', unsafe_allow_html=True)
+    with head_col2:
+        # 버튼을 누르면 캐시를 비우고 앱을 다시 실행합니다.
+        if st.button("🔄"):
+            st.cache_data.clear()
+            with st.spinner(""):
+                time.sleep(0.5)
+                st.rerun()
     
     net_worth = df['금액'].sum()
     total_assets = df[df['금액'] > 0]['금액'].sum()
@@ -81,7 +94,7 @@ if not df.empty:
     # ==========================================
     with main_tab1:
         st.markdown("<div id='summary'></div>", unsafe_allow_html=True)
-        show_assets = st.toggle("👀 금액 보기", value=False)
+        show_assets = st.toggle("👀 금액 상세 보기", value=False)
         col1, col2, col3 = st.columns(3)
         if show_assets:
             col1.metric("💎 순자산", format_krw(net_worth))
@@ -195,7 +208,6 @@ if not df.empty:
                         *주의: 친절하고 격려하는 톤을 유지하되, 마크다운(볼드체)과 이모지를 적절히 사용하여 가독성을 극대화하세요.*
                         """
                         
-                        # 💡 무적의 자동 모델 탐색 로직 (들여쓰기 완벽 정렬됨)
                         valid_models = [m.name for m in genai.list_models() if 'generateContent' in m.supported_generation_methods]
                         chosen_model = next((m for m in valid_models if 'flash' in m), valid_models[0])
                         
@@ -208,4 +220,3 @@ if not df.empty:
                         st.error(f"API 호출 중 문제가 발생했습니다: {e}")
             
         st.write("<br><br><br>", unsafe_allow_html=True)
-
