@@ -148,7 +148,7 @@ if not df.empty:
         col1, col2, col3 = st.columns(3)
         if show_assets:
             # 💡 순자산 메트릭에 delta(변동폭) 적용!
-            delta_text = f"{delta_val/10000:,.0f}만 (이번달 실시간)" if delta_val != 0 else None
+            delta_text = f"{delta_val/10000:,.0f}만 (전월 대비)" if delta_val != 0 else None
             col1.metric("💎 순자산", format_krw(net_worth), delta=delta_text)
             
             col2.metric("💰 총 자산", format_krw(total_assets))
@@ -273,5 +273,6 @@ if not df.empty:
                         st.error(f"API 호출 중 문제가 발생했습니다: {e}")
             
         st.write("<br><br><br>", unsafe_allow_html=True)
+
 
 
