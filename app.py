@@ -3,6 +3,7 @@ import pandas as pd
 import plotly.express as px
 import google.generativeai as genai
 import time
+import datetime
 
 # 1. 페이지 설정
 st.set_page_config(page_title="가족 자산 대시보드", layout="centered")
@@ -35,6 +36,7 @@ st.markdown("""
 try:
     SHEET_ID = st.secrets["SHEET_ID"].strip()
     SHEET_GID = st.secrets["SHEET_GID"].strip()
+    HISTORY_GID = st.secrets.get("HISTORY_GID", "").strip()
     GEMINI_API_KEY = st.secrets.get("GEMINI_API_KEY", "").strip()
     
     if GEMINI_API_KEY:
@@ -60,6 +62,16 @@ def load_data():
         df = pd.read_csv(url)
         df['금액'] = pd.to_numeric(df['금액'].astype(str).str.replace(',', '').str.replace('₩', ''), errors='coerce').fillna(0)
         df.loc[df['대분류'] == '부채', '금액'] = df.loc[df['대분류'] == '부채', '금액'].abs() * -1
+        return df
+    except Exception as e:
+        return pd.DataFrame()
+
+@st.cache_data(ttl=60)
+def load_history_data(gid):
+    url = f"https://docs.google.com/spreadsheets/d/{SHEET_ID}/export?format=csv&gid={gid}"
+    try:
+        # skiprows=2로 위쪽 2줄 날리고 3행(1월, 2월..)을 헤더로 씁니다.
+        df = pd.read_csv(url, skiprows=2) 
         return df
     except Exception as e:
         return pd.DataFrame()
@@ -225,5 +237,6 @@ if not df.empty:
                         st.error(f"API 호출 중 문제가 발생했습니다: {e}")
             
         st.write("<br><br><br>", unsafe_allow_html=True)
+
 
 
