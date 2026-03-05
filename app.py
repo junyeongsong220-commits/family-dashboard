@@ -69,14 +69,20 @@ def load_data():
 # 💡 마지막 업데이트 시간을 G1 셀에서 가져오는 함수
 @st.cache_data(ttl=60)
 def get_last_update_info():
-    url = f"https://docs.google.com/spreadsheets/d/{SHEET_ID}/export?format=csv&gid={SHEET_GID}&range=G1:G1"
+    # range 옵션을 빼고 시트 전체를 불러오도록 URL 수정
+    url = f"https://docs.google.com/spreadsheets/d/{SHEET_ID}/export?format=csv&gid={SHEET_GID}"
     try:
-        # 헤더가 없으므로 header=None으로 읽기
-        time_df = pd.read_csv(url, header=None)
-        if not time_df.empty:
-            return str(time_df.iloc[0, 0])
+        # 첫 번째 줄(nrows=1)만 헤더 없이(header=None) 읽어옵니다.
+        time_df = pd.read_csv(url, header=None, nrows=1)
+        
+        # G1 셀은 0번 행의 6번 열입니다 (A=0, B=1, C=2, D=3, E=4, F=5, G=6)
+        if not time_df.empty and len(time_df.columns) > 6:
+            val = time_df.iloc[0, 6]
+            if pd.isna(val): return None  # 셀이 비어있으면 None 반환
+            return str(val).strip()
         return None
-    except:
+    except Exception as e:
+        # 에러가 궁금하다면 주석 해제: st.write(f"시간 읽기 에러: {e}")
         return None
 
 @st.cache_data(ttl=60)
@@ -267,4 +273,5 @@ if not df.empty:
                         st.error(f"API 호출 중 문제가 발생했습니다: {e}")
             
         st.write("<br><br><br>", unsafe_allow_html=True)
+
 
